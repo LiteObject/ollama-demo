@@ -1,4 +1,4 @@
-# Demo Ollama Locally
+# Demo Ollama
 
 ## What is ollama?
 >Ollama is a tool that allows you to run open-source large language models (LLMs) locally on your machine.
