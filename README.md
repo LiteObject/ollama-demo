@@ -210,4 +210,3 @@ The agent follows this conversation flow:
 - [Ollama Official Repository](https://github.com/ollama/ollama)
 - [Ollama Python SDK Documentation](https://github.com/ollama/ollama-python)
 - [Available Models](https://ollama.com/library)
-- [API Key Setup](https://ollama.com/) - Required for web search functionality
