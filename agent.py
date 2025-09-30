@@ -21,6 +21,9 @@ except ImportError:  # pragma: no cover - optional dependency
 import ollama
 from ollama import chat, ChatResponse, Message, ResponseError, RequestError
 
+# Define available tools as a constant for easier configuration
+AVAILABLE_TOOLS = [ollama.web_search, ollama.web_fetch]
+
 
 def _load_env_file_fallback(env_path: Path) -> bool:
     """Load key=value pairs from a .env file when python-dotenv is unavailable."""
@@ -156,11 +159,15 @@ def main():
     """
     # Dictionary mapping tool names to their callable functions
     # These tools allow the LLM to search and fetch web content
-    available_tools = {"web_search": ollama.web_search, "web_fetch": ollama.web_fetch}
+    available_tools = {tool.__name__: tool for tool in AVAILABLE_TOOLS}
 
     # Display welcome message and instructions
     print("Ollama Agent with Web Search")
     print("Type 'quit' or 'exit' to stop the conversation")
+
+    # Display model configuration
+    model_name = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
+    print(f"🤖 Using model: {model_name}")
 
     # Check if API key is available for web search
     if not os.getenv("OLLAMA_API_KEY"):
@@ -195,15 +202,15 @@ def main():
             try:
                 print(f"\n--- Iteration {iteration_count} ---")
 
+                # Get model name from environment variable with fallback
+                model_name = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
+
                 # Get LLM response using our normalized chat wrapper
                 # This handles the model's response and any tool calls it wants to make
                 response = get_chat_response(
-                    model="gpt-oss:20b",  # Ollama model name
+                    model=model_name,  # Ollama model name from env or default
                     messages=messages,  # Full conversation history
-                    tools=[
-                        ollama.web_search,
-                        ollama.web_fetch,
-                    ],  # Available tools for LLM
+                    tools=AVAILABLE_TOOLS,  # Available tools for LLM
                     think=True,  # Enable internal reasoning
                 )
 

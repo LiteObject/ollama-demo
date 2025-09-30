@@ -63,14 +63,18 @@ Ollama is a tool that allows you to run open-source large language models (LLMs)
    ollama pull gpt-oss:20b
    ```
 
-4. **Set up web search (optional)**:
+4. **Set up configuration**:
    Create a `.env` file in the project root:
    ```bash
    cp .env.example .env
    ```
-   Edit the `.env` file and add your API key:
+   Edit the `.env` file to configure your settings:
    ```env
+   # Required for web search functionality
    OLLAMA_API_KEY=your_actual_api_key_here
+   
+   # Optional: Specify which model to use (defaults to gpt-oss:20b)
+   OLLAMA_MODEL=gpt-oss:20b
    ```
    Sign up at [ollama.com](https://ollama.com/) to get an API key for web search functionality.
 
@@ -181,7 +185,12 @@ See [requirements.txt](requirements.txt) for the complete list of Python depende
    - Or set environment variable: `export OLLAMA_API_KEY="your_api_key"`
    - The agent will work without web search if no API key is provided
 
-4. **Import Warning**: If you see "python-dotenv not installed" warning
+4. **Different Model**: To use a different model
+   - Set `OLLAMA_MODEL=your_model_name` in your `.env` file
+   - Or set environment variable: `export OLLAMA_MODEL="your_model_name"`
+   - Make sure the model is available: `ollama pull your_model_name`
+
+5. **Import Warning**: If you see "python-dotenv not installed" warning
    - Install it with: `pip install python-dotenv`
    - Or ignore it - the agent includes a fallback `.env` parser
 
