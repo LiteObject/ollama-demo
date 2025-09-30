@@ -8,51 +8,75 @@ The agent maintains conversation context, handles tool calls automatically,
 and provides a user-friendly interface for multi-turn conversations.
 """
 
+import os
 import sys
+from pathlib import Path
 from typing import Dict, Any, List, cast
 
-# Import Ollama SDK components for chat and web tools
-from ollama import chat, web_fetch, web_search, ChatResponse, Message
+try:
+    from dotenv import load_dotenv  # type: ignore[import]
+except ImportError:  # pragma: no cover - optional dependency
+    load_dotenv = None  # type: ignore[assignment]
 
-# Import specific error types for better error handling
-from ollama import ResponseError, RequestError
+import ollama
+from ollama import chat, ChatResponse, Message, ResponseError, RequestError
+
+
+def _load_env_file_fallback(env_path: Path) -> bool:
+    """Load key=value pairs from a .env file when python-dotenv is unavailable."""
+
+    if not env_path.exists():
+        return False
+
+    loaded_any = False
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and value and key not in os.environ:
+            os.environ[key] = value
+            loaded_any = True
+
+    return loaded_any
+
+
+if load_dotenv is not None:
+    load_dotenv()
+else:
+    ENV_FILE = Path(__file__).resolve().parent / ".env"
+    if _load_env_file_fallback(ENV_FILE):
+        print("ℹ️  Loaded environment variables from .env using fallback parser.")
+    else:
+        print("Warning: python-dotenv not installed and no .env file could be loaded.")
+        print("Install with: pip install python-dotenv")
 
 
 def message_to_dict(message) -> Dict[str, Any]:
-    """Convert a Message object to a dictionary for the conversation history.
+    """Convert a Message object to a dictionary for the conversation history."""
 
-    This function normalizes Ollama Message objects into standard dictionary format
-    that can be easily serialized and passed back to the chat API.
-
-    Args:
-        message: Ollama Message object with role, content, and optional fields
-
-    Returns:
-        Dictionary with message data in standard chat format
-    """
-    # Start with required fields: role and content
     result = {
-        "role": message.role,  # "user", "assistant", or "tool"
-        "content": message.content or "",  # Main message text
+        "role": getattr(message, "role", "assistant"),
+        "content": getattr(message, "content", "") or "",
     }
 
-    # Add optional thinking process (internal reasoning from model)
     if hasattr(message, "thinking") and message.thinking:
         result["thinking"] = message.thinking
 
-    # Convert tool calls to serializable format for conversation history
     if hasattr(message, "tool_calls") and message.tool_calls:
         result["tool_calls"] = [
             {
                 "function": {
-                    "name": tc.function.name,  # Tool function name
-                    "arguments": tc.function.arguments,  # Tool arguments as dict
+                    "name": tc.function.name,
+                    "arguments": tc.function.arguments,
                 }
             }
             for tc in message.tool_calls
         ]
 
-    # Add tool name if this is a tool response message
     if hasattr(message, "tool_name") and message.tool_name:
         result["tool_name"] = message.tool_name
 
@@ -132,11 +156,19 @@ def main():
     """
     # Dictionary mapping tool names to their callable functions
     # These tools allow the LLM to search and fetch web content
-    available_tools = {"web_search": web_search, "web_fetch": web_fetch}
+    available_tools = {"web_search": ollama.web_search, "web_fetch": ollama.web_fetch}
 
     # Display welcome message and instructions
     print("Ollama Agent with Web Search")
     print("Type 'quit' or 'exit' to stop the conversation")
+
+    # Check if API key is available for web search
+    if not os.getenv("OLLAMA_API_KEY"):
+        print("⚠️  Note: Web search requires OLLAMA_API_KEY environment variable")
+        print("   Sign up at https://ollama.com/ to get an API key for web search")
+    else:
+        print("✅ Web search enabled with API key")
+
     print("-" * 50)
 
     # Get the initial question from user (or use default)
@@ -166,9 +198,12 @@ def main():
                 # Get LLM response using our normalized chat wrapper
                 # This handles the model's response and any tool calls it wants to make
                 response = get_chat_response(
-                    model="gpt-oss",  # Ollama model name
+                    model="gpt-oss:20b",  # Ollama model name
                     messages=messages,  # Full conversation history
-                    tools=[web_search, web_fetch],  # Available tools for LLM
+                    tools=[
+                        ollama.web_search,
+                        ollama.web_fetch,
+                    ],  # Available tools for LLM
                     think=True,  # Enable internal reasoning
                 )
 
@@ -210,7 +245,7 @@ def main():
                                 # Show user a preview of the tool result
                                 result_str = str(result)
                                 print(
-                                    f"    Result (first 200 chars): {result_str[:200]}..."
+                                    f"    ✅ Result (first 200 chars): {result_str[:200]}..."
                                 )
 
                                 # Add tool result to conversation for model to use
@@ -232,11 +267,39 @@ def main():
                                 RuntimeError,  # Other runtime issues
                             ) as tool_error:
                                 # Handle tool execution errors gracefully
-                                error_msg = (
-                                    f"Error executing tool "
-                                    f"{tool_call.function.name}: {tool_error}"
-                                )
-                                print(f"    ❌ {error_msg}")
+                                error_msg = str(tool_error)
+
+                                # Provide specific help for web search authentication errors
+                                if (
+                                    "Authorization header with Bearer token is required"
+                                    in error_msg
+                                ):
+                                    print(
+                                        f"    ❌ Error executing tool "
+                                        f"{tool_call.function.name}: {error_msg}"
+                                    )
+                                    print(
+                                        "    💡 Web search requires an Ollama API key. "
+                                        "To enable web search:"
+                                    )
+                                    print("       1. Sign up at https://ollama.com/")
+                                    print(
+                                        "       2. Create an API key from your account"
+                                    )
+                                    print(
+                                        "       3. Set environment variable: "
+                                        'export OLLAMA_API_KEY="your_api_key"'
+                                    )
+                                    print("       4. Restart this application")
+                                    error_msg = (
+                                        "Web search unavailable - requires API key setup. "
+                                        "See instructions above."
+                                    )
+                                else:
+                                    print(
+                                        f"    ❌ Error executing tool "
+                                        f"{tool_call.function.name}: {error_msg}"
+                                    )
 
                                 # Still add error to conversation so model knows what happened
                                 messages.append(

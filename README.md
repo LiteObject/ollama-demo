@@ -15,6 +15,7 @@ Ollama is a tool that allows you to run open-source large language models (LLMs)
 - **Type-safe implementation**: Full type hints and proper error handling
 - **User-friendly interface**: Clear progress indicators and formatted output
 - **Context management**: Smart truncation of results to prevent token overflow
+- **Environment variable support**: Built-in `.env` file parser (works even without python-dotenv)
 
 ### Available Tools
 - **Web Search**: Search the internet for current information
@@ -37,10 +38,13 @@ Ollama is a tool that allows you to run open-source large language models (LLMs)
 
 3. **Install required model**:
    ```bash
-   ollama pull gpt-oss
+   ollama pull gpt-oss:20b
    ```
 
-4. **Run the agent**:
+4. **Set up web search (optional)**:
+   Follow the web search setup instructions in Option 2, step 4.
+
+5. **Run the agent**:
    ```bash
    python agent.py
    ```
@@ -56,15 +60,27 @@ Ollama is a tool that allows you to run open-source large language models (LLMs)
 
 3. **Install required model**:
    ```bash
-   ollama pull gpt-oss
+   ollama pull gpt-oss:20b
    ```
 
-4. **Install Python dependencies**:
+4. **Set up web search (optional)**:
+   Create a `.env` file in the project root:
+   ```bash
+   cp .env.example .env
+   ```
+   Edit the `.env` file and add your API key:
+   ```env
+   OLLAMA_API_KEY=your_actual_api_key_here
+   ```
+   Sign up at [ollama.com](https://ollama.com/) to get an API key for web search functionality.
+
+5. **Install Python dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
+   Note: `python-dotenv` is optional. The agent includes a fallback `.env` parser that works without it.
 
-5. **Run the agent**:
+6. **Run the agent**:
    ```bash
    python agent.py
    ```
@@ -75,31 +91,52 @@ Ollama is a tool that allows you to run open-source large language models (LLMs)
 ```
 Enter your question (or press Enter for default): What is the latest news about AI?
 
-Thinking: I need to search for recent AI news to provide current information...
-Tool calls: 1
+--- Iteration 1 ---
+🤔 Thinking: I need to search for recent AI news to provide current information...
+🔧 Tool calls: 1
   Tool 1: web_search
     Arguments: {'query': 'latest AI news 2024'}
-    Result (first 200 chars): Recent developments in artificial intelligence include...
-Response: Based on my search, here are the latest developments in AI...
+    ✅ Result (first 200 chars): Recent developments in artificial intelligence include...
+💬 Response: Based on my search, here are the latest developments in AI...
 ```
 
 ### Multi-turn Conversation
 ```
-Final response received. Would you like to ask another question?
+🎯 Final response received. Would you like to ask another question?
 
 Enter your next question (or 'quit'/'exit' to stop): Tell me more about that company
 
-Thinking: The user wants more details about the company mentioned...
+--- Iteration 2 ---
+🤔 Thinking: The user wants more details about the company mentioned...
+```
+
+### Web Search Not Configured
+```
+⚠️  Note: Web search requires OLLAMA_API_KEY environment variable
+   Sign up at https://ollama.com/ to get an API key for web search
+
+--- Iteration 1 ---
+🔧 Tool calls: 1
+  Tool 1: web_search
+    ❌ Error executing tool web_search: Authorization header with Bearer token is required
+    💡 Web search requires an Ollama API key. To enable web search:
+       1. Sign up at https://ollama.com/
+       2. Create an API key from your account
+       3. Set environment variable: export OLLAMA_API_KEY="your_api_key"
+       4. Restart this application
 ```
 
 ## Dependencies
 
 See [requirements.txt](requirements.txt) for the complete list of Python dependencies:
 
-- `ollama==0.6.0` - Official Ollama Python SDK
-- `httpx==0.28.1` - HTTP client for web requests
-- `pydantic==2.11.9` - Data validation and type safety
-- Other supporting libraries for async operations and type checking
+### Required
+- `ollama>=0.6.0` - Official Ollama Python SDK (includes web search support)
+- `httpx>=0.28.1` - HTTP client for web requests
+- `pydantic>=2.11.9` - Data validation and type safety
+
+### Optional
+- `python-dotenv` - Automatic `.env` file loading (agent includes fallback parser)
 
 ## Project Structure
 
@@ -107,6 +144,8 @@ See [requirements.txt](requirements.txt) for the complete list of Python depende
 ├── agent.py              # Main interactive agent with web search
 ├── docker-compose.yml    # Docker setup for Ollama service
 ├── requirements.txt      # Python dependencies
+├── .env                  # Environment variables (API keys) - not tracked in git
+├── .env.example          # Example environment file
 ├── README.md             # This file
 └── .gitignore            # Git ignore rules
 ```
@@ -114,27 +153,61 @@ See [requirements.txt](requirements.txt) for the complete list of Python depende
 ## Key Features of the Agent
 
 - **Robust Error Handling**: Handles connection issues, API errors, and tool failures
-- **Interactive Loop**: Supports multi-turn conversations with context retention
+- **Interactive Loop**: Supports multi-turn conversations with context retention (max 10 iterations per question)
 - **Web Integration**: Can search and fetch web content in real-time
 - **Thinking Mode**: Shows the AI's reasoning process
-- **Performance Optimized**: Smart context management and result truncation
-- **User-Friendly**: Clear feedback, progress indicators, and easy exit options
+- **Performance Optimized**: Smart context management (8000 char limit for tool results)
+- **User-Friendly**: Clear feedback with emojis, progress indicators, and easy exit options
+- **Fallback Support**: Works even without python-dotenv using built-in `.env` parser
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Connection Error**: Ensure Ollama is running (`ollama serve`)
-2. **Model Not Found**: Install the required model (`ollama pull gpt-oss`)
+1. **Connection Error**: Ensure Ollama is running
+   ```bash
+   ollama serve
+   ```
+
+2. **Model Not Found**: Install the required model
+   ```bash
+   ollama pull gpt-oss:20b
+   ```
+
+3. **Web Search Authentication Error**: Web search requires an API key
+   - Sign up at [ollama.com](https://ollama.com/)
+   - Create an API key from your account dashboard
+   - Add it to your `.env` file: `OLLAMA_API_KEY=your_api_key`
+   - Or set environment variable: `export OLLAMA_API_KEY="your_api_key"`
+   - The agent will work without web search if no API key is provided
+
+4. **Import Warning**: If you see "python-dotenv not installed" warning
+   - Install it with: `pip install python-dotenv`
+   - Or ignore it - the agent includes a fallback `.env` parser
 
 ### Getting Help
 
 - Verify Ollama installation at [ollama.com](https://ollama.com)
 - Ensure all dependencies are installed: `pip install -r requirements.txt`
-- Check Ollama service status: `docker compose up -d` or local service status
+- Check Ollama service status: `ollama list` to see available models
+- For Docker users: `docker-compose logs` to check container status
+
+## How It Works
+
+The agent follows this conversation flow:
+
+1. **User Input**: Accept question from user
+2. **LLM Processing**: Send to GPT-OSS model with thinking enabled
+3. **Tool Detection**: Model decides if web search/fetch is needed
+4. **Tool Execution**: Run requested tools (with authentication if configured)
+5. **Result Integration**: Add tool results to conversation context
+6. **Response Generation**: Model generates final answer using all information
+7. **Iteration Check**: Continue if more tools needed (max 10 iterations)
+8. **User Continuation**: Ask if user wants to continue conversation
 
 ## References
 
 - [Ollama Official Repository](https://github.com/ollama/ollama)
 - [Ollama Python SDK Documentation](https://github.com/ollama/ollama-python)
 - [Available Models](https://ollama.com/library)
+- [API Key Setup](https://ollama.com/) - Required for web search functionality
